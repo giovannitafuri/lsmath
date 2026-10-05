@@ -19,11 +19,11 @@ enum {
 };
 
 /*
-	LSMVECTOR is used as a generic 4 float vector to do calculations
-	so user don't need to convert between vector of different sizes
-
-	There are specific LSMFLOAT(N) storage version with N can be 2, 3, 4
-*/
+ *	LSMVECTOR is used as a generic 4 float vector to do calculations
+ *	so user don't need to convert between vector of different sizes
+ *
+ *	There are specific LSMFLOAT(N) storage version with N can be 2, 3, 4
+ */
 
 
 typedef struct LSMFLOAT4 { float data[4]; } LSMFLOAT4;
@@ -34,34 +34,33 @@ typedef struct LSMFLOAT2 { float data[2]; } LSMFLOAT2;
 
 typedef union LSMVECTOR {
 	float data[4];
-	struct { float x, y, z, w; } d;
+	struct { float x, y, z, w; };
 } LSMVECTOR;
 
 /*
-	If an erro occurred in loading the LSMVECTOR, numOfComponents will be set to -1
-*/
+ *	If an erro occurred in loading the LSMVECTOR, numOfComponents will be set to -1
+ */
 static inline uint8_t LSMLoadVector(void* src, uint8_t numOfComponents, LSMVECTOR* dst) {
 	if (!src || !dst) return LSM_POINTER_ERROR;
 
 	switch (numOfComponents)
 	{
-	case 2:
-		memcpy(dst->data, src, 2 * sizeof(float));
-		break;
+		case 2:
+			memcpy(dst->data, src, 2 * sizeof(float));
+			break;
+		case 3:
+			memcpy(dst->data, src, 3 * sizeof(float));
+			break;
 
-	case 3:
-		memcpy(dst->data, src, 3 * sizeof(float));
-		break;
+		case 4:
+			memcpy(dst->data, src, 4 * sizeof(float));
+			break;
 
-	case 4:
-		memcpy(dst->data, src, 4 * sizeof(float));
-		break;
-
-	default:
-		return LSM_NUM_OF_COMPONENTS_ERROR;
-		break;
-
+		default:
+			return LSM_NUM_OF_COMPONENTS_ERROR;
 	}
+
+	return LSM_SUCCESS;
 }
 
 static inline LSMFLOAT4 LSMStoreFloat4(LSMVECTOR v) {
@@ -92,9 +91,9 @@ static inline LSMFLOAT2 LSMStoreFloat2(LSMVECTOR v) {
 }
 
 /*
-	Zero vector
-	Return a vector with X, Y, Z, W set to 0.0f
-*/
+ *	Zero vector
+ *	Return a vector with X, Y, Z, W set to 0.0f
+ */
 static inline LSMVECTOR LSMVectorZero() {
 	LSMVECTOR zeroVector = { 0.0f };
 
@@ -102,9 +101,9 @@ static inline LSMVECTOR LSMVectorZero() {
 }
 
 /*
-	Vector scaling
-	It takes the LSMVECTOR vector and float scalar, it return a new vector
-*/
+ *	Vector scaling
+ *	It takes the LSMVECTOR vector and float scalar, it return a new vector
+ */
 static inline LSMVECTOR LSMVectorScale(LSMVECTOR v, float s) {
 	v.data[LSM_X] *= s;
 	v.data[LSM_Y] *= s;
@@ -115,9 +114,9 @@ static inline LSMVECTOR LSMVectorScale(LSMVECTOR v, float s) {
 }
 
 /*
-	Component-wise multiplication
-	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
-*/
+ *	Component-wise multiplication
+ *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ */
 static inline LSMVECTOR LSMVectorMul(LSMVECTOR v1, LSMVECTOR v2) {
 	v1.data[LSM_X] *= v2.data[LSM_X];
 	v1.data[LSM_Y] *= v2.data[LSM_Y];
@@ -128,58 +127,90 @@ static inline LSMVECTOR LSMVectorMul(LSMVECTOR v1, LSMVECTOR v2) {
 }
 
 /*
-	Dot Product
-	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a float(scalar)
-*/
+ *	Dot Product
+ *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a float(scalar)
+ */
 static inline float LSMVectorDot(LSMVECTOR v1, LSMVECTOR v2) {
 	return	(v1.data[LSM_X] * v2.data[LSM_X]) +
-		(v1.data[LSM_Y] * v2.data[LSM_Y]) +
-		(v1.data[LSM_Z] * v2.data[LSM_Z]) +
-		(v1.data[LSM_W] * v2.data[LSM_W]);
+	(v1.data[LSM_Y] * v2.data[LSM_Y]) +
+	(v1.data[LSM_Z] * v2.data[LSM_Z]) +
+	(v1.data[LSM_W] * v2.data[LSM_W]);
 }
 
 /*
-	Cross Product
-	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
-*/
+ *	Cross Product
+ *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ */
 static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
-	LSMVECTOR crossVector;
-	crossVector.data[LSM_X] =
-		(v1.data[LSM_Y] * v2.data[LSM_Z]) - (v1.data[LSM_Z] * v2.data[LSM_Y]);
-	crossVector.data[LSM_Y] =
-		(v1.data[LSM_Z] * v2.data[LSM_X]) - (v1.data[LSM_X] * v2.data[LSM_Z]);
-	crossVector.data[LSM_Z] =
-		(v1.data[LSM_X] * v2.data[LSM_Y]) - (v1.data[LSM_Y] * v2.data[LSM_X]);
-	crossVector.data[LSM_W] = 0.0f;
+	LSMVECTOR cross_vector;
+	cross_vector.data[LSM_X] =
+	(v1.data[LSM_Y] * v2.data[LSM_Z]) - (v1.data[LSM_Z] * v2.data[LSM_Y]);
+	cross_vector.data[LSM_Y] =
+	(v1.data[LSM_Z] * v2.data[LSM_X]) - (v1.data[LSM_X] * v2.data[LSM_Z]);
+	cross_vector.data[LSM_Z] =
+	(v1.data[LSM_X] * v2.data[LSM_Y]) - (v1.data[LSM_Y] * v2.data[LSM_X]);
+	cross_vector.data[LSM_W] = 0.0f;
 
-	return crossVector;
+	return cross_vector;
 }
-
-static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
-	LSMVECTOR crossVector;
-	crossVector.data[LSM_X] =
-		(v1.data[LSM_Y] * v2.data[LSM_Z]) - (v1.data[LSM_Z] * v2.data[LSM_Y]);
-	crossVector.data[LSM_Y] =
-		(v1.data[LSM_Z] * v2.data[LSM_X]) - (v1.data[LSM_X] * v2.data[LSM_Z]);
-	crossVector.data[LSM_Z] =
-		(v1.data[LSM_X] * v2.data[LSM_Y]) - (v1.data[LSM_Y] * v2.data[LSM_X]);
-	crossVector.data[LSM_W] = 0.0f;
-
-	return crossVector;
-}
-
-// TODO(giovi) implement serialization?
 
 /*
-	LSMMATRIX is used as a generic 4x4 float matrix to do calculations
-	so user don't need to convert between matrix of different sizes
-*/
+ *	Vector Addition
+ *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ */
+static inline LSMVECTOR LSMVectorAdd(LSMVECTOR v1, LSMVECTOR v2) {
+	LSMVECTOR new_vector;
+	new_vector.data[LSM_X] =
+	(v1.data[LSM_X] + v2.data[LSM_X]);
+	new_vector.data[LSM_Y] =
+	(v1.data[LSM_Y] + v2.data[LSM_Y]);
+	new_vector.data[LSM_Z] =
+	(v1.data[LSM_Z] + v2.data[LSM_Z]);
+	new_vector.data[LSM_W] =
+	(v1.data[LSM_W] + v2.data[LSM_W]);
 
-typedef union LSMMATRIX {
-	float data[4][4];
-	// TODO(giovi) define access fields
-	struct { float x, y, z, w; } d;
-} LSMMATRIX;
+	return new_vector;
+}
+
+/*
+ * Vector Subtraction
+ * It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ */
+static inline LSMVECTOR LSMVectorSub(LSMVECTOR v1, LSMVECTOR v2) {
+	LSMVECTOR new_vector;
+	new_vector.data[LSM_X] =
+	(v1.data[LSM_X] - v2.data[LSM_X]);
+	new_vector.data[LSM_Y] =
+	(v1.data[LSM_Y] - v2.data[LSM_Y]);
+	new_vector.data[LSM_Z] =
+	(v1.data[LSM_Z] - v2.data[LSM_Z]);
+	new_vector.data[LSM_W] =
+	(v1.data[LSM_W] - v2.data[LSM_W]);
+
+	return new_vector;
+}
+
+#ifdef __cplusplus
+// C++ Operator Overloads that map directly to the C functions
+static inline LSMVECTOR operator+(LSMVECTOR a, LSMVECTOR b) {
+	return LSMVectorAdd(a, b);
+}
+
+static inline LSMVECTOR operator-(LSMVECTOR a, LSMVECTOR b) {
+	return LSMVectorSub(a, b);
+}
+
+static inline LSMVECTOR operator*(LSMVECTOR a, LSMVECTOR b) {
+	return LSMVectorMul(a, b);
+}
+
+static inline LSMVECTOR operator*(LSMVECTOR a, float s) {
+	return LSMVectorScale(a, s);
+}
+
+static inline LSMVECTOR operator*(float s, LSMVECTOR a) {
+	return LSMVectorScale(a, s);
+}
+#endif
 
 #endif // !LIGHT_SIMPLE_MATH_H
-
