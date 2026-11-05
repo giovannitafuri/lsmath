@@ -71,6 +71,18 @@ float dot = LSMVectorDot(v1, v2);
 
 ---
 
+## Status & Roadmap
+
+> **Note:** `lsmath` is a work-in-progress prototype exploring DirectXMath-style load/store vector math in C.
+
+- [x] Separate storage (`LSMFLOAT2/3/4`) and calculation (`LSMVECTOR`) types
+- [x] Pure C99 with zero heap allocations
+- [x] C++ operator overloads (`+`, `-`, `*`)
+- [ ] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON)
+- [ ] 4x4 matrices (LookAt, Perspective, Orthographic)
+
+---
+
 ## License
 
 `lsmath` is released under the BSD 2-Clause License. See `LICENSE` for details.
