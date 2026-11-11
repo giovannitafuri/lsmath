@@ -29,9 +29,8 @@ LSMFLOAT2 pos_storage = { 10.0f, 20.0f };
 LSMFLOAT2 vel_storage = { 1.5f, -0.5f };
 
 // 2. Load into calculation vector
-LSMVECTOR pos, vel;
-LSMLoadVector(&pos_storage, 2, &pos);
-LSMLoadVector(&vel_storage, 2, &vel);
+LSMVECTOR pos = LSMLoadFloat2(&pos_storage);
+LSMVECTOR vel = LSMLoadFloat2(&vel_storage);
 
 // 3. Vector arithmetic
 float dt = 1.0f / 60.0f;
@@ -45,9 +44,9 @@ pos_storage = LSMStoreFloat2(pos);
 ```c
 #include "LSMath.h"
 
+LSMFLOAT3 data = { 1.0f, 2.0f, 3.0f };
 LSMVECTOR v1 = LSMVectorZero();
-LSMVECTOR v2;
-LSMLoadVector(data, 3, &v2);
+LSMVECTOR v2 = LSMLoadFloat3(&data);
 
 LSMVECTOR result = LSMVectorAdd(v1, LSMVectorScale(v2, 2.0f));
 float dot = LSMVectorDot(v1, v2);
@@ -59,7 +58,7 @@ float dot = LSMVectorDot(v1, v2);
 
 | Operation | C Function | C++ Operator |
 | :--- | :--- | :---: |
-| **Load Vector** | `LSMLoadVector(src, num_components, dst)` | — |
+| **Load Vector** | `LSMLoadFloat2`, `LSMLoadFloat3`, `LSMLoadFloat4` | — |
 | **Store Vector** | `LSMStoreFloat2`, `LSMStoreFloat3`, `LSMStoreFloat4` | — |
 | **Set Vector** | `LSMVectorSet(x, y, z, w)` | — |
 | **Zero Vector** | `LSMVectorZero()` | — |

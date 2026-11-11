@@ -13,12 +13,6 @@ enum {
 	LSM_W
 };
 
-enum {
-	LSM_SUCCESS,
-	LSM_NUM_OF_COMPONENTS_ERROR,
-	LSM_POINTER_ERROR
-};
-
 /*
  *	LSMVECTOR is used as a generic 4 float vector to do calculations
  *	so user don't need to convert between vector of different sizes
@@ -39,32 +33,42 @@ typedef union LSMVECTOR {
 } LSMVECTOR;
 
 /*
- *	If an erro occurred in loading the LSMVECTOR, numOfComponents will be set to -1
+ * Load 2 components into a calculation vector, zeroing unused Z and W
  */
-static inline uint8_t LSMLoadVector(void* src, uint8_t numOfComponents, LSMVECTOR* dst) {
-	if (!src || !dst) return LSM_POINTER_ERROR;
+static inline LSMVECTOR LSMLoadFloat2(const LSMFLOAT2* src) {
+	LSMVECTOR v;
+	v.data[LSM_X] = src->data[LSM_X];
+	v.data[LSM_Y] = src->data[LSM_Y];
+	v.data[LSM_Z] = 0.0f;
+	v.data[LSM_W] = 0.0f;
 
-	switch (numOfComponents)
-	{
-		case 2:
-			memcpy(dst->data, src, 2 * sizeof(float));
-			dst->data[LSM_Z] = 0.0f;
-			dst->data[LSM_W] = 0.0f;
-			break;
-		case 3:
-			memcpy(dst->data, src, 3 * sizeof(float));
-			dst->data[LSM_W] = 0.0f;
-			break;
+	return v;
+}
 
-		case 4:
-			memcpy(dst->data, src, 4 * sizeof(float));
-			break;
+/*
+ * Load 3 components into a calculation vector, zeroing unused W
+ */
+static inline LSMVECTOR LSMLoadFloat3(const LSMFLOAT3* src) {
+	LSMVECTOR v;
+	v.data[LSM_X] = src->data[LSM_X];
+	v.data[LSM_Y] = src->data[LSM_Y];
+	v.data[LSM_Z] = src->data[LSM_Z];
+	v.data[LSM_W] = 0.0f;
 
-		default:
-			return LSM_NUM_OF_COMPONENTS_ERROR;
-	}
+	return v;
+}
 
-	return LSM_SUCCESS;
+/*
+ * Load 4 components into a calculation vector
+ */
+static inline LSMVECTOR LSMLoadFloat4(const LSMFLOAT4* src) {
+	LSMVECTOR v;
+	v.data[LSM_X] = src->data[LSM_X];
+	v.data[LSM_Y] = src->data[LSM_Y];
+	v.data[LSM_Z] = src->data[LSM_Z];
+	v.data[LSM_W] = src->data[LSM_W];
+
+	return v;
 }
 
 static inline LSMFLOAT4 LSMStoreFloat4(LSMVECTOR v) {
