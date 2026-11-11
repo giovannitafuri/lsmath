@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 enum {
 	LSM_X,
@@ -47,9 +48,12 @@ static inline uint8_t LSMLoadVector(void* src, uint8_t numOfComponents, LSMVECTO
 	{
 		case 2:
 			memcpy(dst->data, src, 2 * sizeof(float));
+			dst->data[LSM_Z] = 0.0f;
+			dst->data[LSM_W] = 0.0f;
 			break;
 		case 3:
 			memcpy(dst->data, src, 3 * sizeof(float));
+			dst->data[LSM_W] = 0.0f;
 			break;
 
 		case 4:
@@ -190,6 +194,157 @@ static inline LSMVECTOR LSMVectorSub(LSMVECTOR v1, LSMVECTOR v2) {
 	return new_vector;
 }
 
+/*
+ * Construct a vector directly from 4 components
+ */
+static inline LSMVECTOR LSMVectorSet(float x, float y, float z, float w) {
+	LSMVECTOR v;
+	v.data[LSM_X] = x;
+	v.data[LSM_Y] = y;
+	v.data[LSM_Z] = z;
+	v.data[LSM_W] = w;
+
+	return v;
+}
+
+/*
+ * Invert the sign of all vector components
+ */
+static inline LSMVECTOR LSMVectorNegate(LSMVECTOR v) {
+	v.data[LSM_X] = -v.data[LSM_X];
+	v.data[LSM_Y] = -v.data[LSM_Y];
+	v.data[LSM_Z] = -v.data[LSM_Z];
+	v.data[LSM_W] = -v.data[LSM_W];
+
+	return v;
+}
+
+/*
+ * Component-wise division
+ */
+static inline LSMVECTOR LSMVectorDiv(LSMVECTOR v1, LSMVECTOR v2) {
+	v1.data[LSM_X] /= v2.data[LSM_X];
+	v1.data[LSM_Y] /= v2.data[LSM_Y];
+	v1.data[LSM_Z] /= v2.data[LSM_Z];
+	v1.data[LSM_W] /= v2.data[LSM_W];
+
+	return v1;
+}
+
+/*
+ * Divide vector components by a scalar
+ */
+static inline LSMVECTOR LSMVectorDivScalar(LSMVECTOR v, float s) {
+	float inv = 1.0f / s;
+	v.data[LSM_X] *= inv;
+	v.data[LSM_Y] *= inv;
+	v.data[LSM_Z] *= inv;
+	v.data[LSM_W] *= inv;
+
+	return v;
+}
+
+/*
+ * 3D dot product (ignores W component)
+ */
+static inline float LSMVector3Dot(LSMVECTOR v1, LSMVECTOR v2) {
+	return (v1.data[LSM_X] * v2.data[LSM_X]) +
+	       (v1.data[LSM_Y] * v2.data[LSM_Y]) +
+	       (v1.data[LSM_Z] * v2.data[LSM_Z]);
+}
+
+/*
+ * Squared length of 3D components to avoid square root when comparing magnitudes
+ */
+static inline float LSMVectorLengthSq(LSMVECTOR v) {
+	return LSMVector3Dot(v, v);
+}
+
+/*
+ * Length of 3D components
+ */
+static inline float LSMVectorLength(LSMVECTOR v) {
+	return sqrtf(LSMVectorLengthSq(v));
+}
+
+/*
+ * Normalizes 3D components and sets W to 0.0f
+ */
+static inline LSMVECTOR LSMVectorNormalize(LSMVECTOR v) {
+	float lenSq = LSMVectorLengthSq(v);
+	if (lenSq > 0.0f) {
+		float invLen = 1.0f / sqrtf(lenSq);
+		LSMVECTOR r;
+		r.data[LSM_X] = v.data[LSM_X] * invLen;
+		r.data[LSM_Y] = v.data[LSM_Y] * invLen;
+		r.data[LSM_Z] = v.data[LSM_Z] * invLen;
+		r.data[LSM_W] = 0.0f;
+		return r;
+	}
+
+	return LSMVectorZero();
+}
+
+/*
+ * Squared distance between two 3D positions
+ */
+static inline float LSMVectorDistanceSq(LSMVECTOR v1, LSMVECTOR v2) {
+	return LSMVectorLengthSq(LSMVectorSub(v1, v2));
+}
+
+/*
+ * Distance between two 3D positions
+ */
+static inline float LSMVectorDistance(LSMVECTOR v1, LSMVECTOR v2) {
+	return sqrtf(LSMVectorDistanceSq(v1, v2));
+}
+
+/*
+ * Select minimum values component-wise
+ */
+static inline LSMVECTOR LSMVectorMin(LSMVECTOR v1, LSMVECTOR v2) {
+	LSMVECTOR r;
+	r.data[LSM_X] = (v1.data[LSM_X] < v2.data[LSM_X]) ? v1.data[LSM_X] : v2.data[LSM_X];
+	r.data[LSM_Y] = (v1.data[LSM_Y] < v2.data[LSM_Y]) ? v1.data[LSM_Y] : v2.data[LSM_Y];
+	r.data[LSM_Z] = (v1.data[LSM_Z] < v2.data[LSM_Z]) ? v1.data[LSM_Z] : v2.data[LSM_Z];
+	r.data[LSM_W] = (v1.data[LSM_W] < v2.data[LSM_W]) ? v1.data[LSM_W] : v2.data[LSM_W];
+
+	return r;
+}
+
+/*
+ * Select maximum values component-wise
+ */
+static inline LSMVECTOR LSMVectorMax(LSMVECTOR v1, LSMVECTOR v2) {
+	LSMVECTOR r;
+	r.data[LSM_X] = (v1.data[LSM_X] > v2.data[LSM_X]) ? v1.data[LSM_X] : v2.data[LSM_X];
+	r.data[LSM_Y] = (v1.data[LSM_Y] > v2.data[LSM_Y]) ? v1.data[LSM_Y] : v2.data[LSM_Y];
+	r.data[LSM_Z] = (v1.data[LSM_Z] > v2.data[LSM_Z]) ? v1.data[LSM_Z] : v2.data[LSM_Z];
+	r.data[LSM_W] = (v1.data[LSM_W] > v2.data[LSM_W]) ? v1.data[LSM_W] : v2.data[LSM_W];
+
+	return r;
+}
+
+/*
+ * Restrict vector components between min and max bounds
+ */
+static inline LSMVECTOR LSMVectorClamp(LSMVECTOR v, LSMVECTOR min_val, LSMVECTOR max_val) {
+	return LSMVectorMin(LSMVectorMax(v, min_val), max_val);
+}
+
+/*
+ * Linearly interpolate between two vectors
+ */
+static inline LSMVECTOR LSMVectorLerp(LSMVECTOR v1, LSMVECTOR v2, float t) {
+	LSMVECTOR r;
+	r.data[LSM_X] = v1.data[LSM_X] + t * (v2.data[LSM_X] - v1.data[LSM_X]);
+	r.data[LSM_Y] = v1.data[LSM_Y] + t * (v2.data[LSM_Y] - v1.data[LSM_Y]);
+	r.data[LSM_Z] = v1.data[LSM_Z] + t * (v2.data[LSM_Z] - v1.data[LSM_Z]);
+	r.data[LSM_W] = v1.data[LSM_W] + t * (v2.data[LSM_W] - v1.data[LSM_W]);
+
+	return r;
+}
+
 #ifdef __cplusplus
 // C++ Operator Overloads that map directly to the C functions
 static inline LSMVECTOR operator+(LSMVECTOR a, LSMVECTOR b) {
@@ -198,6 +353,10 @@ static inline LSMVECTOR operator+(LSMVECTOR a, LSMVECTOR b) {
 
 static inline LSMVECTOR operator-(LSMVECTOR a, LSMVECTOR b) {
 	return LSMVectorSub(a, b);
+}
+
+static inline LSMVECTOR operator-(LSMVECTOR a) {
+	return LSMVectorNegate(a);
 }
 
 static inline LSMVECTOR operator*(LSMVECTOR a, LSMVECTOR b) {
@@ -210,6 +369,44 @@ static inline LSMVECTOR operator*(LSMVECTOR a, float s) {
 
 static inline LSMVECTOR operator*(float s, LSMVECTOR a) {
 	return LSMVectorScale(a, s);
+}
+
+static inline LSMVECTOR operator/(LSMVECTOR a, LSMVECTOR b) {
+	return LSMVectorDiv(a, b);
+}
+
+static inline LSMVECTOR operator/(LSMVECTOR a, float s) {
+	return LSMVectorDivScalar(a, s);
+}
+
+static inline LSMVECTOR& operator+=(LSMVECTOR& a, LSMVECTOR b) {
+	a = LSMVectorAdd(a, b);
+	return a;
+}
+
+static inline LSMVECTOR& operator-=(LSMVECTOR& a, LSMVECTOR b) {
+	a = LSMVectorSub(a, b);
+	return a;
+}
+
+static inline LSMVECTOR& operator*=(LSMVECTOR& a, LSMVECTOR b) {
+	a = LSMVectorMul(a, b);
+	return a;
+}
+
+static inline LSMVECTOR& operator*=(LSMVECTOR& a, float s) {
+	a = LSMVectorScale(a, s);
+	return a;
+}
+
+static inline LSMVECTOR& operator/=(LSMVECTOR& a, LSMVECTOR b) {
+	a = LSMVectorDiv(a, b);
+	return a;
+}
+
+static inline LSMVECTOR& operator/=(LSMVECTOR& a, float s) {
+	a = LSMVectorDivScalar(a, s);
+	return a;
 }
 #endif
 

@@ -13,7 +13,7 @@ A lightweight, single-header C/C++ vector math library inspired by the DirectXMa
 - **Single-Header:** Just drop `LSMath.h` into your project.
 - **Zero Dependencies:** Pure C99 with standard library types (`<stdint.h>`, `<string.h>`).
 - **Zero Allocations:** Pure POD structs passed by value or reference.
-- **C & C++ Dual Support:** Native C inline functions, with optional C++ operator overloading (`+`, `-`, `*`) enabled automatically under `__cplusplus`.
+- **C & C++ Dual Support:** Native C inline functions, with optional C++ operator overloading (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`) enabled automatically under `__cplusplus`.
 - **DirectXMath Load/Store Pattern:** Explicit memory staging avoids alignment penalties and implicit conversions.
 
 ---
@@ -61,13 +61,22 @@ float dot = LSMVectorDot(v1, v2);
 | :--- | :--- | :---: |
 | **Load Vector** | `LSMLoadVector(src, num_components, dst)` | — |
 | **Store Vector** | `LSMStoreFloat2`, `LSMStoreFloat3`, `LSMStoreFloat4` | — |
+| **Set Vector** | `LSMVectorSet(x, y, z, w)` | — |
 | **Zero Vector** | `LSMVectorZero()` | — |
-| **Scaling** | `LSMVectorScale(v, s)` | `v * s` / `s * v` |
-| **Addition** | `LSMVectorAdd(v1, v2)` | `v1 + v2` |
-| **Subtraction** | `LSMVectorSub(v1, v2)` | `v1 - v2` |
-| **Hadamard Product** | `LSMVectorMul(v1, v2)` | `v1 * v2` |
-| **Dot Product** | `LSMVectorDot(v1, v2)` | — |
+| **Negation** | `LSMVectorNegate(v)` | `-v` |
+| **Scaling** | `LSMVectorScale(v, s)` | `v * s` / `s * v`, `v *= s` |
+| **Addition** | `LSMVectorAdd(v1, v2)` | `v1 + v2`, `v1 += v2` |
+| **Subtraction** | `LSMVectorSub(v1, v2)` | `v1 - v2`, `v1 -= v2` |
+| **Hadamard Product** | `LSMVectorMul(v1, v2)` | `v1 * v2`, `v1 *= v2` |
+| **Division** | `LSMVectorDiv(v1, v2)` / `LSMVectorDivScalar(v, s)` | `v1 / v2`, `v / s`, `/=` |
+| **Dot Product (4D)** | `LSMVectorDot(v1, v2)` | — |
+| **Dot Product (3D)** | `LSMVector3Dot(v1, v2)` | — |
 | **Cross Product** | `LSMVectorCross(v1, v2)` | — |
+| **Length / Magnitude** | `LSMVectorLength(v)`, `LSMVectorLengthSq(v)` | — |
+| **Normalize** | `LSMVectorNormalize(v)` | — |
+| **Distance** | `LSMVectorDistance(v1, v2)`, `LSMVectorDistanceSq(v1, v2)` | — |
+| **Linear Interpolation** | `LSMVectorLerp(v1, v2, t)` | — |
+| **Min / Max / Clamp** | `LSMVectorMin`, `LSMVectorMax`, `LSMVectorClamp` | — |
 
 ---
 
