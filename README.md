@@ -4,17 +4,35 @@ A lightweight, single-header C/C++ vector math library inspired by the DirectXMa
 
 `lsmath` separates calculation types from memory storage types to ensure maximum cache density and SIMD alignment:
 - **`LSMVECTOR`:** 4-float calculation vector union (`x, y, z, w` or `data[4]`) aligned for fast CPU register manipulation.
-- **`LSMFLOAT2` / `LSMFLOAT3` / `LSMFLOAT4`:** Compact storage types for flat arrays and Structure of Arrays (SoA) component pools.
+- **`LSMMATRIX`:** 4x4 calculation matrix union (`r[4]` row vectors or `m[4][4]` / `data[16]`) in row-major layout.
+- **`LSMFLOAT2` / `LSMFLOAT3` / `LSMFLOAT4` / `LSMFLOAT4X4`:** Compact storage types for flat arrays and Structure of Arrays (SoA) component pools.
 
 ---
 
 ## Features
 
 - **Single-Header:** Just drop `LSMath.h` into your project.
-- **Zero Dependencies:** Pure C99 with standard library types (`<stdint.h>`, `<string.h>`).
+- **Zero Dependencies:** Pure C99 with standard library types (`<stdint.h>`, `<string.h>`, `<math.h>`).
 - **Zero Allocations:** Pure POD structs passed by value or reference.
 - **C & C++ Dual Support:** Native C inline functions, with optional C++ operator overloading (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`) enabled automatically under `__cplusplus`.
 - **DirectXMath Load/Store Pattern:** Explicit memory staging avoids alignment penalties and implicit conversions.
+
+---
+
+## Configuration
+
+`lsmath` supports both Row-Major and Column-Major matrix conventions via a compile-time macro:
+
+| Macro | Value | Description |
+| :--- | :---: | :--- |
+| `LSM_ROW_MAJOR` | `0` | **(Default)** Row-major matrices (DirectX / HLSL style). Row vectors (`v * m`), `r[4]` rows. |
+| `LSM_COLUMN_MAJOR` | `1` | Column-major matrices (OpenGL / GLSL style). Column vectors (`m * v`), `c[4]` columns. |
+
+To switch to Column-Major, define `MATRIX_ORDER` (or `LSM_MATRIX_ORDER`) before including `LSMath.h`:
+```c
+#define MATRIX_ORDER 1 // or pass -DMATRIX_ORDER=1 to compiler
+#include "LSMath.h"
+```
 
 ---
 
@@ -76,6 +94,16 @@ float dot = LSMVectorDot(v1, v2);
 | **Distance** | `LSMVectorDistance(v1, v2)`, `LSMVectorDistanceSq(v1, v2)` | — |
 | **Linear Interpolation** | `LSMVectorLerp(v1, v2, t)` | — |
 | **Min / Max / Clamp** | `LSMVectorMin`, `LSMVectorMax`, `LSMVectorClamp` | — |
+| **Load Matrix** | `LSMLoadFloat4x4(src)` | — |
+| **Store Matrix** | `LSMStoreFloat4x4(m)` | — |
+| **Identity / Zero Matrix** | `LSMMatrixIdentity()`, `LSMMatrixZero()` | — |
+| **Transpose** | `LSMMatrixTranspose(m)` | — |
+| **Matrix Multiplication** | `LSMMatrixMultiply(m1, m2)` | `m1 * m2`, `m1 *= m2` |
+| **Vector Transformation** | `LSMVector4Transform(v, m)`, `LSMVector3TransformCoord(v, m)`, `LSMVector3TransformNormal(v, m)` | `v * m`, `m * v` |
+| **Affine Transformations** | `LSMMatrixTranslation(x, y, z)`, `LSMMatrixScaling(x, y, z)`, `LSMMatrixRotationX/Y/Z(angle)` | — |
+| **Camera View** | `LSMMatrixLookAtLH(eye, target, up)`, `LSMMatrixLookAtRH(eye, target, up)` | — |
+| **Perspective Projection** | `LSMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ)`, `...RH(...)` | — |
+| **Orthographic Projection** | `LSMMatrixOrthographicLH(w, h, nearZ, farZ)`, `...RH(...)` | — |
 
 ---
 
@@ -83,11 +111,11 @@ float dot = LSMVectorDot(v1, v2);
 
 > **Note:** `lsmath` is a work-in-progress prototype exploring DirectXMath-style load/store vector math in C.
 
-- [x] Separate storage (`LSMFLOAT2/3/4`) and calculation (`LSMVECTOR`) types
+- [x] Separate storage (`LSMFLOAT2/3/4/4X4`) and calculation (`LSMVECTOR`, `LSMMATRIX`) types
 - [x] Pure C99 with zero heap allocations
-- [x] C++ operator overloads (`+`, `-`, `*`)
+- [x] C++ operator overloads (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`)
+- [x] 4x4 matrices (LookAt, Perspective, Orthographic, Transformations)
 - [ ] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON)
-- [ ] 4x4 matrices (LookAt, Perspective, Orthographic)
 
 ---
 

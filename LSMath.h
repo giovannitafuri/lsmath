@@ -13,6 +13,17 @@ enum {
 	LSM_W
 };
 
+#define LSM_ROW_MAJOR    0
+#define LSM_COLUMN_MAJOR 1
+
+#ifndef LSM_MATRIX_ORDER
+#ifdef MATRIX_ORDER
+#define LSM_MATRIX_ORDER MATRIX_ORDER
+#else
+#define LSM_MATRIX_ORDER LSM_ROW_MAJOR
+#endif
+#endif
+
 /*
  *	LSMVECTOR is used as a generic 4 float vector to do calculations
  *	so user don't need to convert between vector of different sizes
@@ -20,6 +31,8 @@ enum {
  *	There are specific LSMFLOAT(N) storage version with N can be 2, 3, 4
  */
 
+
+typedef struct LSMFLOAT4X4 { float m[4][4]; } LSMFLOAT4X4;
 
 typedef struct LSMFLOAT4 { float data[4]; } LSMFLOAT4;
 
@@ -31,6 +44,17 @@ typedef union LSMVECTOR {
 	float data[4];
 	struct { float x, y, z, w; };
 } LSMVECTOR;
+
+typedef union LSMMATRIX {
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	LSMVECTOR r[4];
+#else
+	LSMVECTOR c[4];
+	LSMVECTOR r[4];
+#endif
+	float m[4][4];
+	float data[16];
+} LSMMATRIX;
 
 /*
  * Load 2 components into a calculation vector, zeroing unused Z and W
@@ -94,6 +118,34 @@ static inline LSMFLOAT2 LSMStoreFloat2(LSMVECTOR v) {
 	LSMFLOAT2 storage;
 	storage.data[LSM_X] = v.data[LSM_X];
 	storage.data[LSM_Y] = v.data[LSM_Y];
+
+	return storage;
+}
+
+/*
+ * Load a 4x4 matrix from compact storage memory
+ */
+static inline LSMMATRIX LSMLoadFloat4x4(const LSMFLOAT4X4* src) {
+	LSMMATRIX mat;
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			mat.m[i][j] = src->m[i][j];
+		}
+	}
+
+	return mat;
+}
+
+/*
+ * Store a calculation matrix into compact 4x4 memory
+ */
+static inline LSMFLOAT4X4 LSMStoreFloat4x4(LSMMATRIX mat) {
+	LSMFLOAT4X4 storage;
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			storage.m[i][j] = mat.m[i][j];
+		}
+	}
 
 	return storage;
 }
@@ -349,6 +401,323 @@ static inline LSMVECTOR LSMVectorLerp(LSMVECTOR v1, LSMVECTOR v2, float t) {
 	return r;
 }
 
+/*
+ * Return a 4x4 identity matrix
+ */
+static inline LSMMATRIX LSMMatrixIdentity(void) {
+	LSMMATRIX mat = { 0 };
+	mat.m[0][0] = 1.0f;
+	mat.m[1][1] = 1.0f;
+	mat.m[2][2] = 1.0f;
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
+/*
+ * Return a 4x4 zero matrix
+ */
+static inline LSMMATRIX LSMMatrixZero(void) {
+	LSMMATRIX mat = { 0 };
+	return mat;
+}
+
+/*
+ * Transpose rows and columns of a matrix
+ */
+static inline LSMMATRIX LSMMatrixTranspose(LSMMATRIX mat) {
+	LSMMATRIX res;
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			res.m[i][j] = mat.m[j][i];
+		}
+	}
+
+	return res;
+}
+
+/*
+ * Multiply two 4x4 matrices (m1 * m2)
+ */
+static inline LSMMATRIX LSMMatrixMultiply(LSMMATRIX m1, LSMMATRIX m2) {
+	LSMMATRIX res;
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			res.m[i][j] = m1.m[i][0] * m2.m[0][j] +
+			              m1.m[i][1] * m2.m[1][j] +
+			              m1.m[i][2] * m2.m[2][j] +
+			              m1.m[i][3] * m2.m[3][j];
+		}
+	}
+#else
+	for (int c = 0; c < 4; ++c) {
+		for (int r = 0; r < 4; ++r) {
+			res.m[c][r] = m1.m[0][r] * m2.m[c][0] +
+			              m1.m[1][r] * m2.m[c][1] +
+			              m1.m[2][r] * m2.m[c][2] +
+			              m1.m[3][r] * m2.m[c][3];
+		}
+	}
+#endif
+
+	return res;
+}
+
+/*
+ * Transform a 4D vector by a matrix (v * m in row-major, m * v in column-major)
+ */
+static inline LSMVECTOR LSMVector4Transform(LSMVECTOR v, LSMMATRIX m) {
+	LSMVECTOR res;
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	res.data[LSM_X] = v.data[LSM_X] * m.m[0][0] + v.data[LSM_Y] * m.m[1][0] + v.data[LSM_Z] * m.m[2][0] + v.data[LSM_W] * m.m[3][0];
+	res.data[LSM_Y] = v.data[LSM_X] * m.m[0][1] + v.data[LSM_Y] * m.m[1][1] + v.data[LSM_Z] * m.m[2][1] + v.data[LSM_W] * m.m[3][1];
+	res.data[LSM_Z] = v.data[LSM_X] * m.m[0][2] + v.data[LSM_Y] * m.m[1][2] + v.data[LSM_Z] * m.m[2][2] + v.data[LSM_W] * m.m[3][2];
+	res.data[LSM_W] = v.data[LSM_X] * m.m[0][3] + v.data[LSM_Y] * m.m[1][3] + v.data[LSM_Z] * m.m[2][3] + v.data[LSM_W] * m.m[3][3];
+#else
+	res.data[LSM_X] = m.m[0][0] * v.data[LSM_X] + m.m[1][0] * v.data[LSM_Y] + m.m[2][0] * v.data[LSM_Z] + m.m[3][0] * v.data[LSM_W];
+	res.data[LSM_Y] = m.m[0][1] * v.data[LSM_X] + m.m[1][1] * v.data[LSM_Y] + m.m[2][1] * v.data[LSM_Z] + m.m[3][1] * v.data[LSM_W];
+	res.data[LSM_Z] = m.m[0][2] * v.data[LSM_X] + m.m[1][2] * v.data[LSM_Y] + m.m[2][2] * v.data[LSM_Z] + m.m[3][2] * v.data[LSM_W];
+	res.data[LSM_W] = m.m[0][3] * v.data[LSM_X] + m.m[1][3] * v.data[LSM_Y] + m.m[2][3] * v.data[LSM_Z] + m.m[3][3] * v.data[LSM_W];
+#endif
+
+	return res;
+}
+
+/*
+ * Transform a 3D coordinate (w=1.0f) by a matrix and project back dividing by W
+ */
+static inline LSMVECTOR LSMVector3TransformCoord(LSMVECTOR v, LSMMATRIX m) {
+	LSMVECTOR p = v;
+	p.data[LSM_W] = 1.0f;
+	LSMVECTOR res = LSMVector4Transform(p, m);
+
+	float invW = 1.0f / res.data[LSM_W];
+	res.data[LSM_X] *= invW;
+	res.data[LSM_Y] *= invW;
+	res.data[LSM_Z] *= invW;
+	res.data[LSM_W] = 1.0f;
+
+	return res;
+}
+
+/*
+ * Transform a 3D direction vector (w=0.0f) by a matrix, ignoring translation
+ */
+static inline LSMVECTOR LSMVector3TransformNormal(LSMVECTOR v, LSMMATRIX m) {
+	LSMVECTOR n = v;
+	n.data[LSM_W] = 0.0f;
+	LSMVECTOR res = LSMVector4Transform(n, m);
+	res.data[LSM_W] = 0.0f;
+
+	return res;
+}
+
+/*
+ * Create a translation matrix
+ */
+static inline LSMMATRIX LSMMatrixTranslation(float x, float y, float z) {
+	LSMMATRIX mat = LSMMatrixIdentity();
+	mat.m[3][0] = x;
+	mat.m[3][1] = y;
+	mat.m[3][2] = z;
+
+	return mat;
+}
+
+/*
+ * Create a non-uniform scale matrix
+ */
+static inline LSMMATRIX LSMMatrixScaling(float x, float y, float z) {
+	LSMMATRIX mat = { 0 };
+	mat.m[0][0] = x;
+	mat.m[1][1] = y;
+	mat.m[2][2] = z;
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
+/*
+ * Create a rotation matrix around the X axis (angle in radians)
+ */
+static inline LSMMATRIX LSMMatrixRotationX(float angle) {
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	LSMMATRIX mat = LSMMatrixIdentity();
+	mat.m[1][1] = c;
+	mat.m[1][2] = s;
+	mat.m[2][1] = -s;
+	mat.m[2][2] = c;
+
+	return mat;
+}
+
+/*
+ * Create a rotation matrix around the Y axis (angle in radians)
+ */
+static inline LSMMATRIX LSMMatrixRotationY(float angle) {
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	LSMMATRIX mat = LSMMatrixIdentity();
+	mat.m[0][0] = c;
+	mat.m[0][2] = -s;
+	mat.m[2][0] = s;
+	mat.m[2][2] = c;
+
+	return mat;
+}
+
+/*
+ * Create a rotation matrix around the Z axis (angle in radians)
+ */
+static inline LSMMATRIX LSMMatrixRotationZ(float angle) {
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	LSMMATRIX mat = LSMMatrixIdentity();
+	mat.m[0][0] = c;
+	mat.m[0][1] = s;
+	mat.m[1][0] = -s;
+	mat.m[1][1] = c;
+
+	return mat;
+}
+
+/*
+ * Left-handed view matrix (camera looking towards target)
+ */
+static inline LSMMATRIX LSMMatrixLookAtLH(LSMVECTOR eye, LSMVECTOR target, LSMVECTOR up) {
+	LSMVECTOR zAxis = LSMVectorNormalize(LSMVectorSub(target, eye));
+	LSMVECTOR xAxis = LSMVectorNormalize(LSMVectorCross(up, zAxis));
+	LSMVECTOR yAxis = LSMVectorCross(zAxis, xAxis);
+
+	LSMMATRIX mat;
+	mat.m[0][0] = xAxis.data[LSM_X];
+	mat.m[0][1] = yAxis.data[LSM_X];
+	mat.m[0][2] = zAxis.data[LSM_X];
+	mat.m[0][3] = 0.0f;
+
+	mat.m[1][0] = xAxis.data[LSM_Y];
+	mat.m[1][1] = yAxis.data[LSM_Y];
+	mat.m[1][2] = zAxis.data[LSM_Y];
+	mat.m[1][3] = 0.0f;
+
+	mat.m[2][0] = xAxis.data[LSM_Z];
+	mat.m[2][1] = yAxis.data[LSM_Z];
+	mat.m[2][2] = zAxis.data[LSM_Z];
+	mat.m[2][3] = 0.0f;
+
+	mat.m[3][0] = -LSMVector3Dot(xAxis, eye);
+	mat.m[3][1] = -LSMVector3Dot(yAxis, eye);
+	mat.m[3][2] = -LSMVector3Dot(zAxis, eye);
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
+/*
+ * Right-handed view matrix
+ */
+static inline LSMMATRIX LSMMatrixLookAtRH(LSMVECTOR eye, LSMVECTOR target, LSMVECTOR up) {
+	LSMVECTOR zAxis = LSMVectorNormalize(LSMVectorSub(eye, target));
+	LSMVECTOR xAxis = LSMVectorNormalize(LSMVectorCross(up, zAxis));
+	LSMVECTOR yAxis = LSMVectorCross(zAxis, xAxis);
+
+	LSMMATRIX mat;
+	mat.m[0][0] = xAxis.data[LSM_X];
+	mat.m[0][1] = yAxis.data[LSM_X];
+	mat.m[0][2] = zAxis.data[LSM_X];
+	mat.m[0][3] = 0.0f;
+
+	mat.m[1][0] = xAxis.data[LSM_Y];
+	mat.m[1][1] = yAxis.data[LSM_Y];
+	mat.m[1][2] = zAxis.data[LSM_Y];
+	mat.m[1][3] = 0.0f;
+
+	mat.m[2][0] = xAxis.data[LSM_Z];
+	mat.m[2][1] = yAxis.data[LSM_Z];
+	mat.m[2][2] = zAxis.data[LSM_Z];
+	mat.m[2][3] = 0.0f;
+
+	mat.m[3][0] = -LSMVector3Dot(xAxis, eye);
+	mat.m[3][1] = -LSMVector3Dot(yAxis, eye);
+	mat.m[3][2] = -LSMVector3Dot(zAxis, eye);
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
+/*
+ * Left-handed perspective projection matrix (depth range [0, 1])
+ */
+static inline LSMMATRIX LSMMatrixPerspectiveFovLH(float fovAngleY, float aspectRatio, float nearZ, float farZ) {
+	float h = 1.0f / tanf(fovAngleY * 0.5f);
+	float w = h / aspectRatio;
+	float range = farZ - nearZ;
+
+	LSMMATRIX mat = { 0 };
+	mat.m[0][0] = w;
+	mat.m[1][1] = h;
+	mat.m[2][2] = farZ / range;
+	mat.m[2][3] = 1.0f;
+	mat.m[3][2] = -(nearZ * farZ) / range;
+
+	return mat;
+}
+
+/*
+ * Right-handed perspective projection matrix (depth range [0, 1])
+ */
+static inline LSMMATRIX LSMMatrixPerspectiveFovRH(float fovAngleY, float aspectRatio, float nearZ, float farZ) {
+	float h = 1.0f / tanf(fovAngleY * 0.5f);
+	float w = h / aspectRatio;
+	float range = nearZ - farZ;
+
+	LSMMATRIX mat = { 0 };
+	mat.m[0][0] = w;
+	mat.m[1][1] = h;
+	mat.m[2][2] = farZ / range;
+	mat.m[2][3] = -1.0f;
+	mat.m[3][2] = (nearZ * farZ) / range;
+
+	return mat;
+}
+
+/*
+ * Left-handed orthographic projection matrix (depth range [0, 1])
+ */
+static inline LSMMATRIX LSMMatrixOrthographicLH(float viewWidth, float viewHeight, float nearZ, float farZ) {
+	float range = farZ - nearZ;
+
+	LSMMATRIX mat = { 0 };
+	mat.m[0][0] = 2.0f / viewWidth;
+	mat.m[1][1] = 2.0f / viewHeight;
+	mat.m[2][2] = 1.0f / range;
+	mat.m[3][2] = -nearZ / range;
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
+/*
+ * Right-handed orthographic projection matrix (depth range [0, 1])
+ */
+static inline LSMMATRIX LSMMatrixOrthographicRH(float viewWidth, float viewHeight, float nearZ, float farZ) {
+	float range = nearZ - farZ;
+
+	LSMMATRIX mat = { 0 };
+	mat.m[0][0] = 2.0f / viewWidth;
+	mat.m[1][1] = 2.0f / viewHeight;
+	mat.m[2][2] = 1.0f / range;
+	mat.m[3][2] = nearZ / range;
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
 #ifdef __cplusplus
 // C++ Operator Overloads that map directly to the C functions
 static inline LSMVECTOR operator+(LSMVECTOR a, LSMVECTOR b) {
@@ -410,6 +779,23 @@ static inline LSMVECTOR& operator/=(LSMVECTOR& a, LSMVECTOR b) {
 
 static inline LSMVECTOR& operator/=(LSMVECTOR& a, float s) {
 	a = LSMVectorDivScalar(a, s);
+	return a;
+}
+
+static inline LSMMATRIX operator*(LSMMATRIX a, LSMMATRIX b) {
+	return LSMMatrixMultiply(a, b);
+}
+
+static inline LSMVECTOR operator*(LSMVECTOR v, LSMMATRIX m) {
+	return LSMVector4Transform(v, m);
+}
+
+static inline LSMVECTOR operator*(LSMMATRIX m, LSMVECTOR v) {
+	return LSMVector4Transform(v, m);
+}
+
+static inline LSMMATRIX& operator*=(LSMMATRIX& a, LSMMATRIX b) {
+	a = LSMMatrixMultiply(a, b);
 	return a;
 }
 #endif
