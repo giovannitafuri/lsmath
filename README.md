@@ -2,21 +2,21 @@
 
 A lightweight, single-header C/C++ vector math library inspired by the DirectXMath load/store architecture.
 
-`lsmath` separates calculation types from memory storage types to ensure maximum cache density and SIMD alignment:
-- **`LSMVECTOR`:** 4-float calculation vector union (`x, y, z, w` or `data[4]`) aligned for fast CPU register manipulation.
-- **`LSMMATRIX`:** 4x4 calculation matrix union (`r[4]` row vectors or `m[4][4]` / `data[16]`) in row-major layout.
-- **`LSMFLOAT2` / `LSMFLOAT3` / `LSMFLOAT4` / `LSMFLOAT4X4`:** Compact storage types for flat arrays and Structure of Arrays (SoA) component pools.
+`lsmath` separates calculation types from memory storage types to ensure maximum cache density and explicit hardware register mapping:
+- **`LSMVECTOR`:** 4-float calculation vector union (`x, y, z, w`, `data[4]`, or SIMD register). Aligned to 16 bytes when SIMD is enabled (standard 4-byte float alignment in scalar fallback).
+- **`LSMMATRIX`:** 4x4 calculation matrix union (`r[4]` vectors or `m[4][4]` / `data[16]`), row-major by default with optional column-major layout.
+- **`LSMFLOAT2` / `LSMFLOAT3` / `LSMFLOAT4` / `LSMFLOAT4X4`:** Compact storage types for contiguous flat arrays (Array of Structures / AoS).
 
 ---
 
 ## Features
 
 - **Single-Header:** Just drop `LSMath.h` into your project.
-- **Zero Dependencies:** Pure C99 with standard library types (`<stdint.h>`, `<string.h>`, `<math.h>`).
+- **Zero Dependencies:** C99-compatible on supported compilers using anonymous-struct extensions, with standard library types (`<stdint.h>`, `<string.h>`, `<math.h>`).
 - **Zero Allocations:** Pure POD structs passed by value or reference.
-- **C & C++ Dual Support:** Native C inline functions, with optional C++ operator overloading (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`) enabled automatically under `__cplusplus`.
-- **Hardware SIMD Acceleration:** 128-bit hardware acceleration for x86/x64 (`__m128` SSE/SSE2) and ARM (`float32x4_t` NEON), with automatic pure C99 scalar fallback.
-- **DirectXMath Load/Store Pattern:** Explicit memory staging avoids alignment penalties and implicit conversions.
+- **C & C++ Dual Support:** Native C inline functions, with optional C++ operator overloading (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`). Uses compiler-supported anonymous-struct and union type-punning extensions.
+- **Hardware SIMD Acceleration:** 128-bit hardware acceleration for x86/x64 (`__m128` SSE/SSE2) and ARM64 (`float32x4_t` NEON), with automatic scalar fallback (e.g. for ARM32 or platforms without SIMD).
+- **DirectXMath Load/Store Pattern:** Explicit memory staging between compact storage and CPU calculation types, avoiding implicit conversions.
 
 ---
 
@@ -112,6 +112,13 @@ float dot = LSMVectorDot(v1, v2);
 | **Perspective Projection** | `LSMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ)`, `...RH(...)` | — |
 | **Orthographic Projection** | `LSMMatrixOrthographicLH(w, h, nearZ, farZ)`, `...RH(...)` | — |
 
+> **Notes on Design & Mathematical Conventions:**
+> - **XYZ vs XYZW Scope:** 3D geometric operations (`LSMVectorLength`, `LSMVectorLengthSq`, `LSMVectorNormalize`, `LSMVectorCross`, `LSMVector3Dot`, `LSMVectorDistance`, `LSMVectorDistanceSq`) operate specifically on the 3D components **XYZ** (ignoring or zeroing W). Component-wise algebraic operations (`LSMVectorAdd`, `LSMVectorSub`, `LSMVectorMul`, `LSMVectorDiv`, `LSMVectorDivScalar`, `LSMVectorDot`, `LSMVectorLerp`, `LSMVectorMin/Max/Clamp`) operate across all **4 components XYZW**.
+> - **Matrix Composition Order:** In default row-major mode (`LSM_ROW_MAJOR`), transformations are composed left-to-right (`M_tot = M1 * M2`, applied as `v * M`). In column-major mode (`LSM_COLUMN_MAJOR`), transformations are composed right-to-left (`M_tot = M2 * M1`, applied as `M * v`).
+> - **Projection Depth Range [0, 1]:** Projections use the modern depth range $[0, 1]$ (Direct3D, Vulkan, Metal, modern OpenGL). Selecting `LSM_COLUMN_MAJOR` changes matrix memory and multiplication order, but does NOT convert the depth range to OpenGL legacy $[-1, 1]$.
+> - **Surface Normals & Uniform Scale:** `LSMVector3TransformNormal` follows the DirectXMath convention (`XMVector3TransformNormal`), transforming directional vectors with $w=0$ assuming uniform scale and orthogonal rotation. If the uniform scale $s \neq 1.0f$, the transformed normal must be re-normalized. For non-uniform scaling, surface normals must be transformed using the transpose of the inverse matrix.
+> - **Normalization Dynamic Range:** `LSMVectorNormalize` is intentionally optimized for real-time graphics performance without multi-pass scaling branches. It assumes typical finite float magnitudes; extreme magnitudes ($|v| > 10^{19}$ or $|v| < 10^{-19}$) may cause length-squared overflow/underflow.
+
 ---
 
 ## Status & Roadmap
@@ -119,7 +126,7 @@ float dot = LSMVectorDot(v1, v2);
 > **Note:** `lsmath` is a work-in-progress prototype exploring DirectXMath-style load/store vector math in C.
 
 - [x] Separate storage (`LSMFLOAT2/3/4/4X4`) and calculation (`LSMVECTOR`, `LSMMATRIX`) types
-- [x] Pure C99 with zero heap allocations
+- [x] Zero heap allocations with C99 / C++ compiler-extension support
 - [x] C++ operator overloads (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`)
 - [x] 4x4 matrices (LookAt, Perspective, Orthographic, Transformations)
 - [x] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON with pure C99 scalar fallback)

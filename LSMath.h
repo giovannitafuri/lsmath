@@ -11,7 +11,7 @@
 #define LSM_USE_SSE 1
 #include <xmmintrin.h>
 #include <emmintrin.h>
-#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+#elif (defined(__ARM_NEON) || defined(__ARM_NEON__)) && (defined(__aarch64__) || defined(_M_ARM64))
 #define LSM_USE_NEON 1
 #include <arm_neon.h>
 #endif
@@ -51,6 +51,14 @@ typedef struct LSMFLOAT3 { float data[3]; } LSMFLOAT3;
 
 typedef struct LSMFLOAT2 { float data[2]; } LSMFLOAT2;
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4201)
+#endif
+
 typedef union LSMVECTOR {
 #if defined(LSM_USE_SSE)
 	__m128 v;
@@ -60,6 +68,12 @@ typedef union LSMVECTOR {
 	float data[4];
 	struct { float x, y, z, w; };
 } LSMVECTOR;
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 typedef union LSMMATRIX {
 #if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
@@ -408,14 +422,13 @@ static inline LSMVECTOR LSMVectorDivScalar(LSMVECTOR v, float s) {
 	v.v = _mm_div_ps(v.v, _mm_set1_ps(s));
 	return v;
 #elif defined(LSM_USE_NEON)
-	v.v = vmulq_n_f32(v.v, 1.0f / s);
+	v.v = vdivq_f32(v.v, vdupq_n_f32(s));
 	return v;
 #else
-	float inv = 1.0f / s;
-	v.data[LSM_X] *= inv;
-	v.data[LSM_Y] *= inv;
-	v.data[LSM_Z] *= inv;
-	v.data[LSM_W] *= inv;
+	v.data[LSM_X] /= s;
+	v.data[LSM_Y] /= s;
+	v.data[LSM_Z] /= s;
+	v.data[LSM_W] /= s;
 
 	return v;
 #endif
@@ -445,7 +458,9 @@ static inline float LSMVectorLength(LSMVECTOR v) {
 }
 
 /*
- * Normalizes 3D components and sets W to 0.0f
+ * Normalizes 3D components and sets W to 0.0f.
+ * Optimized for high performance in real-time graphics. Assumes typical finite float
+ * magnitudes; extreme magnitudes (|v| > 1e19 or |v| < 1e-19) may cause lengthSq overflow/underflow.
  */
 static inline LSMVECTOR LSMVectorNormalize(LSMVECTOR v) {
 	float lenSq = LSMVectorLengthSq(v);
@@ -738,7 +753,10 @@ static inline LSMVECTOR LSMVector3TransformCoord(LSMVECTOR v, LSMMATRIX m) {
 }
 
 /*
- * Transform a 3D direction vector (w=0.0f) by a matrix, ignoring translation
+ * Transform a 3D surface normal/direction vector (w=0.0f) by a matrix, ignoring translation.
+ * Assumes the matrix has uniform scale and orthogonal rotation (DirectXMath convention).
+ * If uniform scale != 1.0f, the resulting normal must be re-normalized. For non-uniform
+ * scaling, transform the normal using the transpose of the inverse matrix.
  */
 static inline LSMVECTOR LSMVector3TransformNormal(LSMVECTOR v, LSMMATRIX m) {
 	LSMVECTOR n = v;
