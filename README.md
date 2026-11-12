@@ -65,7 +65,7 @@ pos = pos + vel * dt;
 pos_storage = LSMStoreFloat2(pos);
 ```
 
-### In Pure C:
+### In C:
 ```c
 #include "LSMath.h"
 
