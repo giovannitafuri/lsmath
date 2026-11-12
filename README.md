@@ -26,8 +26,8 @@ A lightweight, single-header C/C++ vector math library inspired by the DirectXMa
 
 | Macro | Value | Description |
 | :--- | :---: | :--- |
-| `LSM_ROW_MAJOR` | `0` | **(Default)** Row-major matrices (DirectX / HLSL style). Row vectors (`v * m`), `r[4]` rows. |
-| `LSM_COLUMN_MAJOR` | `1` | Column-major matrices (OpenGL / GLSL style). Column vectors (`m * v`), `c[4]` columns. |
+| `LSM_ROW_MAJOR` | `0` | **(Default)** Row-major matrices (DirectXMath-style row-vector convention: `v * m`, `r[4]` rows). |
+| `LSM_COLUMN_MAJOR` | `1` | Column-major matrices (column-vector convention: `m * v`, `c[4]` columns). |
 
 To switch to Column-Major, define `MATRIX_ORDER` (or `LSM_MATRIX_ORDER`) before including `LSMath.h`:
 ```c
@@ -113,9 +113,9 @@ float dot = LSMVectorDot(v1, v2);
 | **Orthographic Projection** | `LSMMatrixOrthographicLH(w, h, nearZ, farZ)`, `...RH(...)` | — |
 
 > **Notes on Design & Mathematical Conventions:**
-> - **XYZ vs XYZW Scope:** 3D geometric operations (`LSMVectorLength`, `LSMVectorLengthSq`, `LSMVectorNormalize`, `LSMVectorCross`, `LSMVector3Dot`, `LSMVectorDistance`, `LSMVectorDistanceSq`) operate specifically on the 3D components **XYZ** (ignoring or zeroing W). Component-wise algebraic operations (`LSMVectorAdd`, `LSMVectorSub`, `LSMVectorMul`, `LSMVectorDiv`, `LSMVectorDivScalar`, `LSMVectorDot`, `LSMVectorLerp`, `LSMVectorMin/Max/Clamp`) operate across all **4 components XYZW**.
-> - **Matrix Composition Order:** In default row-major mode (`LSM_ROW_MAJOR`), transformations are composed left-to-right (`M_tot = M1 * M2`, applied as `v * M`). In column-major mode (`LSM_COLUMN_MAJOR`), transformations are composed right-to-left (`M_tot = M2 * M1`, applied as `M * v`).
-> - **Projection Depth Range [0, 1]:** Projections use the modern depth range $[0, 1]$ (Direct3D, Vulkan, Metal, modern OpenGL). Selecting `LSM_COLUMN_MAJOR` changes matrix memory and multiplication order, but does NOT convert the depth range to OpenGL legacy $[-1, 1]$.
+> - **XYZ vs XYZW Scope:** 3D geometric operations (`LSMVectorLength`, `LSMVectorLengthSq`, `LSMVectorNormalize`, `LSMVectorCross`, `LSMVector3Dot`, `LSMVectorDistance`, `LSMVectorDistanceSq`) operate specifically on the 3D components **XYZ** (ignoring or zeroing W). Component-wise algebraic operations (`LSMVectorAdd`, `LSMVectorSub`, `LSMVectorMul`, `LSMVectorDiv`, `LSMVectorDivScalar`, `LSMVectorLerp`, `LSMVectorMin/Max/Clamp`) operate across all **4 components XYZW**. In addition, `LSMVectorDot` is a 4D scalar reduction computing the full inner product across XYZW.
+> - **Matrix Composition Order:** To apply $M_1$ first, then $M_2$: use `M1 * M2` in row-vector mode (`LSM_ROW_MAJOR`, applied as `v * M`) and `M2 * M1` in column-vector mode (`LSM_COLUMN_MAJOR`, applied as `M * v`).
+> - **Projection Depth Range [0, 1]:** Projections use a $[0, 1]$ depth range (Direct3D, Vulkan, and Metal convention; in OpenGL this requires explicit configuration such as `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`). Selecting `LSM_COLUMN_MAJOR` adapts matrix layout and vector multiplication, but does NOT convert the depth range to $[-1, 1]$.
 > - **Surface Normals & Uniform Scale:** `LSMVector3TransformNormal` follows the DirectXMath convention (`XMVector3TransformNormal`), transforming directional vectors with $w=0$ assuming uniform scale and orthogonal rotation. If the uniform scale $s \neq 1.0f$, the transformed normal must be re-normalized. For non-uniform scaling, surface normals must be transformed using the transpose of the inverse matrix.
 > - **Normalization Dynamic Range:** `LSMVectorNormalize` is intentionally optimized for real-time graphics performance without multi-pass scaling branches. It assumes typical finite float magnitudes; extreme magnitudes ($|v| > 10^{19}$ or $|v| < 10^{-19}$) may cause length-squared overflow/underflow.
 
@@ -129,7 +129,7 @@ float dot = LSMVectorDot(v1, v2);
 - [x] Zero heap allocations with C99 / C++ compiler-extension support
 - [x] C++ operator overloads (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`)
 - [x] 4x4 matrices (LookAt, Perspective, Orthographic, Transformations)
-- [x] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON with pure C99 scalar fallback)
+- [x] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON with scalar fallback)
 
 ---
 
