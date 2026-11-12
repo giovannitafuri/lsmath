@@ -6,6 +6,17 @@
 #include <stdint.h>
 #include <math.h>
 
+#if !defined(LSM_NO_SIMD)
+#if defined(__SSE2__) || defined(__SSE__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#define LSM_USE_SSE 1
+#include <xmmintrin.h>
+#include <emmintrin.h>
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+#define LSM_USE_NEON 1
+#include <arm_neon.h>
+#endif
+#endif
+
 enum {
 	LSM_X,
 	LSM_Y,
@@ -41,6 +52,11 @@ typedef struct LSMFLOAT3 { float data[3]; } LSMFLOAT3;
 typedef struct LSMFLOAT2 { float data[2]; } LSMFLOAT2;
 
 typedef union LSMVECTOR {
+#if defined(LSM_USE_SSE)
+	__m128 v;
+#elif defined(LSM_USE_NEON)
+	float32x4_t v;
+#endif
 	float data[4];
 	struct { float x, y, z, w; };
 } LSMVECTOR;
@@ -87,20 +103,32 @@ static inline LSMVECTOR LSMLoadFloat3(const LSMFLOAT3* src) {
  */
 static inline LSMVECTOR LSMLoadFloat4(const LSMFLOAT4* src) {
 	LSMVECTOR v;
+#if defined(LSM_USE_SSE)
+	v.v = _mm_loadu_ps(src->data);
+#elif defined(LSM_USE_NEON)
+	v.v = vld1q_f32(src->data);
+#else
 	v.data[LSM_X] = src->data[LSM_X];
 	v.data[LSM_Y] = src->data[LSM_Y];
 	v.data[LSM_Z] = src->data[LSM_Z];
 	v.data[LSM_W] = src->data[LSM_W];
+#endif
 
 	return v;
 }
 
 static inline LSMFLOAT4 LSMStoreFloat4(LSMVECTOR v) {
 	LSMFLOAT4 storage;
+#if defined(LSM_USE_SSE)
+	_mm_storeu_ps(storage.data, v.v);
+#elif defined(LSM_USE_NEON)
+	vst1q_f32(storage.data, v.v);
+#else
 	storage.data[LSM_X] = v.data[LSM_X];
 	storage.data[LSM_Y] = v.data[LSM_Y];
 	storage.data[LSM_Z] = v.data[LSM_Z];
 	storage.data[LSM_W] = v.data[LSM_W];
+#endif
 
 	return storage;
 }
@@ -155,7 +183,17 @@ static inline LSMFLOAT4X4 LSMStoreFloat4x4(LSMMATRIX mat) {
  *	Return a vector with X, Y, Z, W set to 0.0f
  */
 static inline LSMVECTOR LSMVectorZero() {
-	LSMVECTOR zeroVector = { 0.0f };
+	LSMVECTOR zeroVector;
+#if defined(LSM_USE_SSE)
+	zeroVector.v = _mm_setzero_ps();
+#elif defined(LSM_USE_NEON)
+	zeroVector.v = vdupq_n_f32(0.0f);
+#else
+	zeroVector.data[LSM_X] = 0.0f;
+	zeroVector.data[LSM_Y] = 0.0f;
+	zeroVector.data[LSM_Z] = 0.0f;
+	zeroVector.data[LSM_W] = 0.0f;
+#endif
 
 	return zeroVector;
 }
@@ -165,12 +203,20 @@ static inline LSMVECTOR LSMVectorZero() {
  *	It takes the LSMVECTOR vector and float scalar, it return a new vector
  */
 static inline LSMVECTOR LSMVectorScale(LSMVECTOR v, float s) {
+#if defined(LSM_USE_SSE)
+	v.v = _mm_mul_ps(v.v, _mm_set1_ps(s));
+	return v;
+#elif defined(LSM_USE_NEON)
+	v.v = vmulq_n_f32(v.v, s);
+	return v;
+#else
 	v.data[LSM_X] *= s;
 	v.data[LSM_Y] *= s;
 	v.data[LSM_Z] *= s;
 	v.data[LSM_W] *= s;
 
 	return v;
+#endif
 }
 
 /*
@@ -178,12 +224,22 @@ static inline LSMVECTOR LSMVectorScale(LSMVECTOR v, float s) {
  *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
  */
 static inline LSMVECTOR LSMVectorMul(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR r;
+	r.v = _mm_mul_ps(v1.v, v2.v);
+	return r;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR r;
+	r.v = vmulq_f32(v1.v, v2.v);
+	return r;
+#else
 	v1.data[LSM_X] *= v2.data[LSM_X];
 	v1.data[LSM_Y] *= v2.data[LSM_Y];
 	v1.data[LSM_Z] *= v2.data[LSM_Z];
 	v1.data[LSM_W] *= v2.data[LSM_W];
 
 	return v1;
+#endif
 }
 
 /*
@@ -202,6 +258,17 @@ static inline float LSMVectorDot(LSMVECTOR v1, LSMVECTOR v2) {
  *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
  */
 static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	__m128 v1_yzx = _mm_shuffle_ps(v1.v, v1.v, _MM_SHUFFLE(3, 0, 2, 1));
+	__m128 v2_zxy = _mm_shuffle_ps(v2.v, v2.v, _MM_SHUFFLE(3, 1, 0, 2));
+	__m128 v1_zxy = _mm_shuffle_ps(v1.v, v1.v, _MM_SHUFFLE(3, 1, 0, 2));
+	__m128 v2_yzx = _mm_shuffle_ps(v2.v, v2.v, _MM_SHUFFLE(3, 0, 2, 1));
+	LSMVECTOR cross_vector;
+	cross_vector.v = _mm_sub_ps(_mm_mul_ps(v1_yzx, v2_zxy), _mm_mul_ps(v1_zxy, v2_yzx));
+	cross_vector.data[LSM_W] = 0.0f;
+
+	return cross_vector;
+#else
 	LSMVECTOR cross_vector;
 	cross_vector.data[LSM_X] =
 	(v1.data[LSM_Y] * v2.data[LSM_Z]) - (v1.data[LSM_Z] * v2.data[LSM_Y]);
@@ -212,6 +279,7 @@ static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
 	cross_vector.data[LSM_W] = 0.0f;
 
 	return cross_vector;
+#endif
 }
 
 /*
@@ -219,6 +287,15 @@ static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
  *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
  */
 static inline LSMVECTOR LSMVectorAdd(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR new_vector;
+	new_vector.v = _mm_add_ps(v1.v, v2.v);
+	return new_vector;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR new_vector;
+	new_vector.v = vaddq_f32(v1.v, v2.v);
+	return new_vector;
+#else
 	LSMVECTOR new_vector;
 	new_vector.data[LSM_X] =
 	(v1.data[LSM_X] + v2.data[LSM_X]);
@@ -230,6 +307,7 @@ static inline LSMVECTOR LSMVectorAdd(LSMVECTOR v1, LSMVECTOR v2) {
 	(v1.data[LSM_W] + v2.data[LSM_W]);
 
 	return new_vector;
+#endif
 }
 
 /*
@@ -237,6 +315,15 @@ static inline LSMVECTOR LSMVectorAdd(LSMVECTOR v1, LSMVECTOR v2) {
  * It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
  */
 static inline LSMVECTOR LSMVectorSub(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR new_vector;
+	new_vector.v = _mm_sub_ps(v1.v, v2.v);
+	return new_vector;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR new_vector;
+	new_vector.v = vsubq_f32(v1.v, v2.v);
+	return new_vector;
+#else
 	LSMVECTOR new_vector;
 	new_vector.data[LSM_X] =
 	(v1.data[LSM_X] - v2.data[LSM_X]);
@@ -248,6 +335,7 @@ static inline LSMVECTOR LSMVectorSub(LSMVECTOR v1, LSMVECTOR v2) {
 	(v1.data[LSM_W] - v2.data[LSM_W]);
 
 	return new_vector;
+#endif
 }
 
 /*
@@ -255,10 +343,17 @@ static inline LSMVECTOR LSMVectorSub(LSMVECTOR v1, LSMVECTOR v2) {
  */
 static inline LSMVECTOR LSMVectorSet(float x, float y, float z, float w) {
 	LSMVECTOR v;
+#if defined(LSM_USE_SSE)
+	v.v = _mm_set_ps(w, z, y, x);
+#elif defined(LSM_USE_NEON)
+	float vals[4] = { x, y, z, w };
+	v.v = vld1q_f32(vals);
+#else
 	v.data[LSM_X] = x;
 	v.data[LSM_Y] = y;
 	v.data[LSM_Z] = z;
 	v.data[LSM_W] = w;
+#endif
 
 	return v;
 }
@@ -267,30 +362,55 @@ static inline LSMVECTOR LSMVectorSet(float x, float y, float z, float w) {
  * Invert the sign of all vector components
  */
 static inline LSMVECTOR LSMVectorNegate(LSMVECTOR v) {
+#if defined(LSM_USE_SSE)
+	v.v = _mm_sub_ps(_mm_setzero_ps(), v.v);
+	return v;
+#elif defined(LSM_USE_NEON)
+	v.v = vnegq_f32(v.v);
+	return v;
+#else
 	v.data[LSM_X] = -v.data[LSM_X];
 	v.data[LSM_Y] = -v.data[LSM_Y];
 	v.data[LSM_Z] = -v.data[LSM_Z];
 	v.data[LSM_W] = -v.data[LSM_W];
 
 	return v;
+#endif
 }
 
 /*
  * Component-wise division
  */
 static inline LSMVECTOR LSMVectorDiv(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR r;
+	r.v = _mm_div_ps(v1.v, v2.v);
+	return r;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR r;
+	r.v = vdivq_f32(v1.v, v2.v);
+	return r;
+#else
 	v1.data[LSM_X] /= v2.data[LSM_X];
 	v1.data[LSM_Y] /= v2.data[LSM_Y];
 	v1.data[LSM_Z] /= v2.data[LSM_Z];
 	v1.data[LSM_W] /= v2.data[LSM_W];
 
 	return v1;
+#endif
 }
 
 /*
  * Divide vector components by a scalar
  */
 static inline LSMVECTOR LSMVectorDivScalar(LSMVECTOR v, float s) {
+#if defined(LSM_USE_SSE)
+	v.v = _mm_div_ps(v.v, _mm_set1_ps(s));
+	return v;
+#elif defined(LSM_USE_NEON)
+	v.v = vmulq_n_f32(v.v, 1.0f / s);
+	return v;
+#else
 	float inv = 1.0f / s;
 	v.data[LSM_X] *= inv;
 	v.data[LSM_Y] *= inv;
@@ -298,6 +418,7 @@ static inline LSMVECTOR LSMVectorDivScalar(LSMVECTOR v, float s) {
 	v.data[LSM_W] *= inv;
 
 	return v;
+#endif
 }
 
 /*
@@ -359,6 +480,15 @@ static inline float LSMVectorDistance(LSMVECTOR v1, LSMVECTOR v2) {
  * Select minimum values component-wise
  */
 static inline LSMVECTOR LSMVectorMin(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR r;
+	r.v = _mm_min_ps(v1.v, v2.v);
+	return r;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR r;
+	r.v = vminq_f32(v1.v, v2.v);
+	return r;
+#else
 	LSMVECTOR r;
 	r.data[LSM_X] = (v1.data[LSM_X] < v2.data[LSM_X]) ? v1.data[LSM_X] : v2.data[LSM_X];
 	r.data[LSM_Y] = (v1.data[LSM_Y] < v2.data[LSM_Y]) ? v1.data[LSM_Y] : v2.data[LSM_Y];
@@ -366,12 +496,22 @@ static inline LSMVECTOR LSMVectorMin(LSMVECTOR v1, LSMVECTOR v2) {
 	r.data[LSM_W] = (v1.data[LSM_W] < v2.data[LSM_W]) ? v1.data[LSM_W] : v2.data[LSM_W];
 
 	return r;
+#endif
 }
 
 /*
  * Select maximum values component-wise
  */
 static inline LSMVECTOR LSMVectorMax(LSMVECTOR v1, LSMVECTOR v2) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR r;
+	r.v = _mm_max_ps(v1.v, v2.v);
+	return r;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR r;
+	r.v = vmaxq_f32(v1.v, v2.v);
+	return r;
+#else
 	LSMVECTOR r;
 	r.data[LSM_X] = (v1.data[LSM_X] > v2.data[LSM_X]) ? v1.data[LSM_X] : v2.data[LSM_X];
 	r.data[LSM_Y] = (v1.data[LSM_Y] > v2.data[LSM_Y]) ? v1.data[LSM_Y] : v2.data[LSM_Y];
@@ -379,6 +519,7 @@ static inline LSMVECTOR LSMVectorMax(LSMVECTOR v1, LSMVECTOR v2) {
 	r.data[LSM_W] = (v1.data[LSM_W] > v2.data[LSM_W]) ? v1.data[LSM_W] : v2.data[LSM_W];
 
 	return r;
+#endif
 }
 
 /*
@@ -392,6 +533,16 @@ static inline LSMVECTOR LSMVectorClamp(LSMVECTOR v, LSMVECTOR min_val, LSMVECTOR
  * Linearly interpolate between two vectors
  */
 static inline LSMVECTOR LSMVectorLerp(LSMVECTOR v1, LSMVECTOR v2, float t) {
+#if defined(LSM_USE_SSE)
+	LSMVECTOR r;
+	__m128 vt = _mm_set1_ps(t);
+	r.v = _mm_add_ps(v1.v, _mm_mul_ps(vt, _mm_sub_ps(v2.v, v1.v)));
+	return r;
+#elif defined(LSM_USE_NEON)
+	LSMVECTOR r;
+	r.v = vaddq_f32(v1.v, vmulq_n_f32(vsubq_f32(v2.v, v1.v), t));
+	return r;
+#else
 	LSMVECTOR r;
 	r.data[LSM_X] = v1.data[LSM_X] + t * (v2.data[LSM_X] - v1.data[LSM_X]);
 	r.data[LSM_Y] = v1.data[LSM_Y] + t * (v2.data[LSM_Y] - v1.data[LSM_Y]);
@@ -399,6 +550,7 @@ static inline LSMVECTOR LSMVectorLerp(LSMVECTOR v1, LSMVECTOR v2, float t) {
 	r.data[LSM_W] = v1.data[LSM_W] + t * (v2.data[LSM_W] - v1.data[LSM_W]);
 
 	return r;
+#endif
 }
 
 /*
@@ -441,6 +593,51 @@ static inline LSMMATRIX LSMMatrixTranspose(LSMMATRIX mat) {
  */
 static inline LSMMATRIX LSMMatrixMultiply(LSMMATRIX m1, LSMMATRIX m2) {
 	LSMMATRIX res;
+#if defined(LSM_USE_SSE)
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	for (int i = 0; i < 4; ++i) {
+		__m128 e0 = _mm_set1_ps(m1.m[i][0]);
+		__m128 e1 = _mm_set1_ps(m1.m[i][1]);
+		__m128 e2 = _mm_set1_ps(m1.m[i][2]);
+		__m128 e3 = _mm_set1_ps(m1.m[i][3]);
+
+		res.r[i].v = _mm_add_ps(
+			_mm_add_ps(_mm_mul_ps(e0, m2.r[0].v), _mm_mul_ps(e1, m2.r[1].v)),
+			_mm_add_ps(_mm_mul_ps(e2, m2.r[2].v), _mm_mul_ps(e3, m2.r[3].v))
+		);
+	}
+#else
+	for (int c = 0; c < 4; ++c) {
+		__m128 e0 = _mm_set1_ps(m2.m[c][0]);
+		__m128 e1 = _mm_set1_ps(m2.m[c][1]);
+		__m128 e2 = _mm_set1_ps(m2.m[c][2]);
+		__m128 e3 = _mm_set1_ps(m2.m[c][3]);
+
+		res.c[c].v = _mm_add_ps(
+			_mm_add_ps(_mm_mul_ps(e0, m1.c[0].v), _mm_mul_ps(e1, m1.c[1].v)),
+			_mm_add_ps(_mm_mul_ps(e2, m1.c[2].v), _mm_mul_ps(e3, m1.c[3].v))
+		);
+	}
+#endif
+#elif defined(LSM_USE_NEON)
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	for (int i = 0; i < 4; ++i) {
+		float32x4_t row = vmulq_n_f32(m2.r[0].v, m1.m[i][0]);
+		row = vmlaq_n_f32(row, m2.r[1].v, m1.m[i][1]);
+		row = vmlaq_n_f32(row, m2.r[2].v, m1.m[i][2]);
+		row = vmlaq_n_f32(row, m2.r[3].v, m1.m[i][3]);
+		res.r[i].v = row;
+	}
+#else
+	for (int c = 0; c < 4; ++c) {
+		float32x4_t col = vmulq_n_f32(m1.c[0].v, m2.m[c][0]);
+		col = vmlaq_n_f32(col, m1.c[1].v, m2.m[c][1]);
+		col = vmlaq_n_f32(col, m1.c[2].v, m2.m[c][2]);
+		col = vmlaq_n_f32(col, m1.c[3].v, m2.m[c][3]);
+		res.c[c].v = col;
+	}
+#endif
+#else
 #if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
@@ -460,6 +657,7 @@ static inline LSMMATRIX LSMMatrixMultiply(LSMMATRIX m1, LSMMATRIX m2) {
 		}
 	}
 #endif
+#endif
 
 	return res;
 }
@@ -469,6 +667,43 @@ static inline LSMMATRIX LSMMatrixMultiply(LSMMATRIX m1, LSMMATRIX m2) {
  */
 static inline LSMVECTOR LSMVector4Transform(LSMVECTOR v, LSMMATRIX m) {
 	LSMVECTOR res;
+#if defined(LSM_USE_SSE)
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	__m128 x = _mm_set1_ps(v.data[LSM_X]);
+	__m128 y = _mm_set1_ps(v.data[LSM_Y]);
+	__m128 z = _mm_set1_ps(v.data[LSM_Z]);
+	__m128 w = _mm_set1_ps(v.data[LSM_W]);
+
+	res.v = _mm_add_ps(
+		_mm_add_ps(_mm_mul_ps(x, m.r[0].v), _mm_mul_ps(y, m.r[1].v)),
+		_mm_add_ps(_mm_mul_ps(z, m.r[2].v), _mm_mul_ps(w, m.r[3].v))
+	);
+#else
+	__m128 x = _mm_set1_ps(v.data[LSM_X]);
+	__m128 y = _mm_set1_ps(v.data[LSM_Y]);
+	__m128 z = _mm_set1_ps(v.data[LSM_Z]);
+	__m128 w = _mm_set1_ps(v.data[LSM_W]);
+
+	res.v = _mm_add_ps(
+		_mm_add_ps(_mm_mul_ps(x, m.c[0].v), _mm_mul_ps(y, m.c[1].v)),
+		_mm_add_ps(_mm_mul_ps(z, m.c[2].v), _mm_mul_ps(w, m.c[3].v))
+	);
+#endif
+#elif defined(LSM_USE_NEON)
+#if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
+	float32x4_t r = vmulq_n_f32(m.r[0].v, v.data[LSM_X]);
+	r = vmlaq_n_f32(r, m.r[1].v, v.data[LSM_Y]);
+	r = vmlaq_n_f32(r, m.r[2].v, v.data[LSM_Z]);
+	r = vmlaq_n_f32(r, m.r[3].v, v.data[LSM_W]);
+	res.v = r;
+#else
+	float32x4_t r = vmulq_n_f32(m.c[0].v, v.data[LSM_X]);
+	r = vmlaq_n_f32(r, m.c[1].v, v.data[LSM_Y]);
+	r = vmlaq_n_f32(r, m.c[2].v, v.data[LSM_Z]);
+	r = vmlaq_n_f32(r, m.c[3].v, v.data[LSM_W]);
+	res.v = r;
+#endif
+#else
 #if LSM_MATRIX_ORDER == LSM_ROW_MAJOR
 	res.data[LSM_X] = v.data[LSM_X] * m.m[0][0] + v.data[LSM_Y] * m.m[1][0] + v.data[LSM_Z] * m.m[2][0] + v.data[LSM_W] * m.m[3][0];
 	res.data[LSM_Y] = v.data[LSM_X] * m.m[0][1] + v.data[LSM_Y] * m.m[1][1] + v.data[LSM_Z] * m.m[2][1] + v.data[LSM_W] * m.m[3][1];
@@ -479,6 +714,7 @@ static inline LSMVECTOR LSMVector4Transform(LSMVECTOR v, LSMMATRIX m) {
 	res.data[LSM_Y] = m.m[0][1] * v.data[LSM_X] + m.m[1][1] * v.data[LSM_Y] + m.m[2][1] * v.data[LSM_Z] + m.m[3][1] * v.data[LSM_W];
 	res.data[LSM_Z] = m.m[0][2] * v.data[LSM_X] + m.m[1][2] * v.data[LSM_Y] + m.m[2][2] * v.data[LSM_Z] + m.m[3][2] * v.data[LSM_W];
 	res.data[LSM_W] = m.m[0][3] * v.data[LSM_X] + m.m[1][3] * v.data[LSM_Y] + m.m[2][3] * v.data[LSM_Z] + m.m[3][3] * v.data[LSM_W];
+#endif
 #endif
 
 	return res;

@@ -15,6 +15,7 @@ A lightweight, single-header C/C++ vector math library inspired by the DirectXMa
 - **Zero Dependencies:** Pure C99 with standard library types (`<stdint.h>`, `<string.h>`, `<math.h>`).
 - **Zero Allocations:** Pure POD structs passed by value or reference.
 - **C & C++ Dual Support:** Native C inline functions, with optional C++ operator overloading (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`) enabled automatically under `__cplusplus`.
+- **Hardware SIMD Acceleration:** 128-bit hardware acceleration for x86/x64 (`__m128` SSE/SSE2) and ARM (`float32x4_t` NEON), with automatic pure C99 scalar fallback.
 - **DirectXMath Load/Store Pattern:** Explicit memory staging avoids alignment penalties and implicit conversions.
 
 ---
@@ -31,6 +32,12 @@ A lightweight, single-header C/C++ vector math library inspired by the DirectXMa
 To switch to Column-Major, define `MATRIX_ORDER` (or `LSM_MATRIX_ORDER`) before including `LSMath.h`:
 ```c
 #define MATRIX_ORDER 1 // or pass -DMATRIX_ORDER=1 to compiler
+#include "LSMath.h"
+```
+
+To disable SIMD and force scalar fallback, define `LSM_NO_SIMD`:
+```c
+#define LSM_NO_SIMD 1
 #include "LSMath.h"
 ```
 
@@ -115,7 +122,7 @@ float dot = LSMVectorDot(v1, v2);
 - [x] Pure C99 with zero heap allocations
 - [x] C++ operator overloads (`+`, `-`, `*`, `/`, `+=`, `-=`, `*=`, `/=`)
 - [x] 4x4 matrices (LookAt, Perspective, Orthographic, Transformations)
-- [ ] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON)
+- [x] Hardware SIMD intrinsics (`__m128` SSE / ARM NEON with pure C99 scalar fallback)
 
 ---
 
