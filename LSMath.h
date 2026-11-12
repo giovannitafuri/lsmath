@@ -35,10 +35,10 @@ enum {
 #endif
 
 /*
- *	LSMVECTOR is used as a generic 4 float vector to do calculations
- *	so user don't need to convert between vector of different sizes
+ *	LSMVECTOR is used as a generic 4-float vector to perform calculations
+ *	so users do not need to convert between vectors of different sizes.
  *
- *	There are specific LSMFLOAT(N) storage version with N can be 2, 3, 4
+ *	There are specific LSMFLOAT(N) storage versions where N can be 2, 3, 4.
  */
 
 
@@ -212,8 +212,7 @@ static inline LSMVECTOR LSMVectorZero() {
 }
 
 /*
- *	Vector scaling
- *	It takes the LSMVECTOR vector and float scalar, it return a new vector
+ * Vector scaling
  */
 static inline LSMVECTOR LSMVectorScale(LSMVECTOR v, float s) {
 #if defined(LSM_USE_SSE)
@@ -233,8 +232,7 @@ static inline LSMVECTOR LSMVectorScale(LSMVECTOR v, float s) {
 }
 
 /*
- *	Component-wise multiplication
- *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ * Component-wise multiplication
  */
 static inline LSMVECTOR LSMVectorMul(LSMVECTOR v1, LSMVECTOR v2) {
 #if defined(LSM_USE_SSE)
@@ -256,8 +254,7 @@ static inline LSMVECTOR LSMVectorMul(LSMVECTOR v1, LSMVECTOR v2) {
 }
 
 /*
- *	Dot Product
- *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a float(scalar)
+ * 4D Dot Product (XYZW)
  */
 static inline float LSMVectorDot(LSMVECTOR v1, LSMVECTOR v2) {
 	return	(v1.data[LSM_X] * v2.data[LSM_X]) +
@@ -267,8 +264,7 @@ static inline float LSMVectorDot(LSMVECTOR v1, LSMVECTOR v2) {
 }
 
 /*
- *	Cross Product
- *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ * 3D Cross Product
  */
 static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
 #if defined(LSM_USE_SSE)
@@ -296,8 +292,7 @@ static inline LSMVECTOR LSMVectorCross(LSMVECTOR v1, LSMVECTOR v2) {
 }
 
 /*
- *	Vector Addition
- *	It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
+ * Vector Addition
  */
 static inline LSMVECTOR LSMVectorAdd(LSMVECTOR v1, LSMVECTOR v2) {
 #if defined(LSM_USE_SSE)
@@ -325,7 +320,6 @@ static inline LSMVECTOR LSMVectorAdd(LSMVECTOR v1, LSMVECTOR v2) {
 
 /*
  * Vector Subtraction
- * It takes the LSMVECTOR vector1 and LSMVECTOR vector2, it return a new vector
  */
 static inline LSMVECTOR LSMVectorSub(LSMVECTOR v1, LSMVECTOR v2) {
 #if defined(LSM_USE_SSE)
